@@ -248,4 +248,5 @@ class DataTools:
         self.get_effective_rate().to_excel(write, sheet_name='有效率', index=True)
         write.save()
         end = time.time()
+        print("输出文件：out.xlsx")
         print('处理时间' + str(datetime.timedelta(seconds=end - start)))
