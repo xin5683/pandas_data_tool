@@ -23,7 +23,58 @@ def validate_datetime(date_text):
 class DataTools:
 
     def __init__(self, excelPath):
+        self.material_attribute_path = './116物质属性.xlsx'
         self.sourcePd = pd.DataFrame(self.__clean_data(excelPath))
+        self.attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
+
+    # def __get_material_attribute(self):
+    #     attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
+    #     # print(list(attribute_dt[attribute_dt['分类'] == 1]['目标化合物名称']))
+    #     # print(pd.Series(attribute_dt.loc[:,'分类'].value_counts()))
+    #     # print(attribute_dt.loc[attribute_dt.loc[:, '分类' == 1]])
+    def get_classify_sum(self, ext_DataFrame=pd.DataFrame()):
+        """
+        浓度分类和
+        :return: DataFrame
+        """
+        classify_s = pd.Series(self.attribute_dt.loc[:, '分类'].value_counts())
+        # print(ext_DataFrame.empty)
+        # exit(0)
+        if ext_DataFrame.empty:
+            dataFrame = pd.DataFrame(self.sourcePd)
+        else:
+            dataFrame = pd.DataFrame(ext_DataFrame)
+
+        tmp_dataFrame = pd.DataFrame()
+        classify_s.sort_index(inplace=True)
+        data_series = pd.Series(dtype='float64')
+        # print(classify_s)
+        for items in classify_s.iteritems():
+            data_series = dataFrame[list(self.attribute_dt[self.attribute_dt['分类'] == items[0]]['目标化合物名称'])].sum(axis=1)
+            tmp_dataFrame[str(items[0])] = data_series
+        tmp_dataFrame['T'] = tmp_dataFrame.sum(axis=1)
+        # print(tmp_dataFrame)
+        return tmp_dataFrame
+
+    def get_OFP(self):
+        dataFrame = pd.DataFrame(self.sourcePd)
+        tmp_dataFrame = pd.DataFrame()
+        # print(dataFrame)
+        for row_index, row in tqdm(dataFrame.iteritems(), desc="OFP progress"):
+            # print(row_index, self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['分子量'].values[0])
+            tmp_dataFrame[row_index] = row * self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['分子量'].values[
+                0] * self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['MIR'].values[0] / 22.4
+        # print(tmp_dataFrame)
+        return tmp_dataFrame
+
+    def get_OFP_classify_sum(self):
+        """
+        OFP的分类和
+        :return:
+        """
+        dataFrame = pd.DataFrame(self.get_OFP())
+        # print(dataFrame)
+        return self.get_classify_sum(ext_DataFrame=dataFrame)
 
     @staticmethod
     def __clean_data(excelPath):
@@ -93,6 +144,10 @@ class DataTools:
         return column_list
 
     def get_week_effective_rate(self):
+        """
+        周有效率
+        :return:
+        """
         week_freq = ('W-SUN', 'W-MON', 'W-TUE', 'W-WED', 'W-THU', 'W-THU', 'W-FRI', 'W-SAT')
         weeks = [g for n, g in
                  self.__effective_rate_clean_data().groupby(
