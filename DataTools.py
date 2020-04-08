@@ -1,3 +1,25 @@
+#   Copyright (c)  2020. Hstar
+#
+#  Permission is hereby granted, free of charge, to any person
+#  obtaining a copy of this software and associated documentation
+# #  files (the "Software"), to deal in the Software without restriction,
+# #  including without limitation the rights to use, copy, modify, merge,
+# #  publish, distribute, sublicense, and/or sell copies of the Software,
+# #  and to permit persons to whom the Software is furnished to do so,
+# #  subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be
+#  included in all copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+#  OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+#  AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+#  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+#  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+#  OTHER DEALINGS IN THE SOFTWARE.
+
 import datetime
 import time
 import os
@@ -27,11 +49,49 @@ class DataTools:
         self.sourcePd = pd.DataFrame(self.__clean_data(excelPath))
         self.attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
 
+    def __get_base_data(self, Index, Column):
+        return self.attribute_dt[self.attribute_dt['目标化合物名称'] == Index][Column]
+
     # def __get_material_attribute(self):
     #     attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
     #     # print(list(attribute_dt[attribute_dt['分类'] == 1]['目标化合物名称']))
     #     # print(pd.Series(attribute_dt.loc[:,'分类'].value_counts()))
     #     # print(attribute_dt.loc[attribute_dt.loc[:, '分类' == 1]])
+    def get_unit_conversion(self):
+        """
+        单位换算
+        :return:DataFrame
+        """
+        dataFrame = pd.DataFrame(self.sourcePd)
+        tmp_dataFrame = pd.DataFrame()
+        for row_index, row in tqdm(dataFrame.iteritems(), desc="单位换算"):
+            data_series = row * self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['分子量'].values[0] / 22.4
+            tmp_dataFrame[row_index] = data_series
+        # print(tmp_dataFrame)
+        return tmp_dataFrame
+
+    def get_uncertainty(self):
+        """
+        获取不确定度
+        :return: DataFrame
+        """
+        dataFrame = pd.DataFrame(self.get_unit_conversion())
+        tmp_dataFrame = pd.DataFrame()
+        for row_index, row in tqdm(dataFrame.iteritems(), desc="不确定度"):
+            tmp1 = row[row > self.__get_base_data(row_index, '检出限（微克）').values[0]]
+            tmp2 = row[row <= self.__get_base_data(row_index, '检出限（微克）').values[0]]
+
+            s = pd.concat([row[row.isnull()],
+                           ((self.__get_base_data(row_index, 'EF').values[0] * tmp1) ** 2 +
+                            ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5,
+                           ((self.__get_base_data(row_index, 'EF').values[0] * tmp2) ** 2 +
+                            ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5
+                           ])
+            s.sort_index(inplace=True)
+            tmp_dataFrame[s.name] = s
+        # print(tmp_dataFrame)
+        return tmp_dataFrame
+
     def get_classify_sum(self, ext_DataFrame=pd.DataFrame()):
         """
         浓度分类和
@@ -47,7 +107,6 @@ class DataTools:
 
         tmp_dataFrame = pd.DataFrame()
         classify_s.sort_index(inplace=True)
-        data_series = pd.Series(dtype='float64')
         # print(classify_s)
         for items in classify_s.iteritems():
             data_series = dataFrame[list(self.attribute_dt[self.attribute_dt['分类'] == items[0]]['目标化合物名称'])].sum(axis=1)
@@ -177,3 +236,16 @@ class DataTools:
             dataFrame[data['column']] = data['data']
         # print(dataFrame)
         return dataFrame
+
+    def output_all(self):
+        start = time.time()
+        write = pd.ExcelWriter('./out.xlsx')
+        self.get_OFP_classify_sum().to_excel(write, sheet_name='分类和', index=True)
+        self.get_OFP().to_excel(write, sheet_name='OFP', index=True)
+        self.get_classify_sum().to_excel(write, sheet_name='OFP分类和', index=True)
+        self.get_unit_conversion().to_excel(write, sheet_name='单位换算', index=True)
+        self.get_uncertainty().to_excel(write, sheet_name='不确定度', index=True)
+        self.get_effective_rate().to_excel(write, sheet_name='有效率', index=True)
+        write.save()
+        end = time.time()
+        print('处理时间' + str(datetime.timedelta(seconds=end - start)))
