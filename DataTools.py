@@ -50,8 +50,8 @@ class DataTools:
 
     def __init__(self, excelPath):
         self.material_attribute_path = './116物质属性.xlsx'
-        self.sourcePd = pd.DataFrame(self.__clean_data(excelPath))
         self.attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
+        self.sourcePd = pd.DataFrame(self.__clean_data(excelPath, self.attribute_dt))
 
     def __get_base_data(self, Index, Column):
         return self.attribute_dt[self.attribute_dt['目标化合物名称'] == Index][Column]
@@ -127,7 +127,6 @@ class DataTools:
         tmp_dataFrame = pd.DataFrame()
         # print(dataFrame)
         for row_index, row in tqdm(dataFrame.iteritems(), desc="OFP progress"):
-            # print(row_index, self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['分子量'].values[0])
             tmp_dataFrame[row_index] = row * self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['分子量'].values[
                 0] * self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['MIR'].values[0] / 22.4
         # print(tmp_dataFrame)
@@ -143,7 +142,7 @@ class DataTools:
         return self.get_classify_sum(ext_DataFrame=dataFrame)
 
     @staticmethod
-    def __clean_data(excelPath):
+    def __clean_data(excelPath, attribute_dt):
         """
         :param excelPath:
         :return:
@@ -162,6 +161,12 @@ class DataTools:
                 row.drop(row.index, inplace=True)
                 tempDT.loc[row_index] = row
         tempDT.replace(-999, np.nan, inplace=True)
+        # 删除不在统计范围内的列
+
+        drop_list = list(set(list(tempDT.columns)) ^ set(list(attribute_dt['目标化合物名称'])))
+        # print(tempDT)
+        tempDT.drop(drop_list, inplace=True,axis=1)
+
         # print(tempDT)
         return tempDT
 
