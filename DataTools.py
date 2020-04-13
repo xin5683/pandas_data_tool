@@ -73,6 +73,8 @@ class DataTools:
     def get_uncertainty(self):
         """
         获取不确定度
+        确定度 = (((0.1*浓度)) * 浓度) ^ 2 + (0.5 * 检出限) ^ 2) ^ 0.5
+        不确定度 = 检出限 * 5 / 6
         :return: DataFrame
         """
         dataFrame = pd.DataFrame(self.get_unit_conversion())
@@ -80,12 +82,12 @@ class DataTools:
         for row_index, row in tqdm(dataFrame.iteritems(), desc="不确定度"):
             tmp1 = row[row > self.__get_base_data(row_index, '检出限（微克）').values[0]]
             tmp2 = row[row <= self.__get_base_data(row_index, '检出限（微克）').values[0]]
+            if len(tmp2):
+                tmp2.values[:] = self.__get_base_data(row_index, '检出限（微克）').values[0] * 5 / 6
 
             s = pd.concat([row[row.isnull()],
-                           ((self.__get_base_data(row_index, 'EF').values[0] * tmp1) ** 2 +
-                            ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5,
-                           ((self.__get_base_data(row_index, 'EF').values[0] * tmp2) ** 2 +
-                            ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5
+                           (((tmp1 * 0.1) * tmp1) ** 2 + ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5,
+                           tmp2
                            ])
             s.sort_index(inplace=True)
             tmp_dataFrame[s.name] = s
