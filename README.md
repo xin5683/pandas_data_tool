@@ -6,7 +6,8 @@
 ```bash
 pip install -r requirements.txt
 ```
-#### 2. 测试 
+#### 2. 执行脚本
 ```bash
+# 修改example.py中要处理的文件
 python example.py
 ```
