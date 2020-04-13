@@ -42,6 +42,10 @@ def validate_datetime(date_text):
         return False
 
 
+elements = ['乙烷', '乙烯', '丙烷', '丙烯', '异丁烷', '乙炔', '正丁烷', '异戊烷', '正戊烷', '氟利昂11',
+            '异戊二烯', '氟利昂113', '丙酮', '四氯化碳', '苯', '甲苯', '乙基苯', '间/对二甲苯', '邻二甲苯', '苯乙烯']
+
+
 class DataTools:
 
     def __init__(self, excelPath):
@@ -86,7 +90,8 @@ class DataTools:
                 tmp2.values[:] = self.__get_base_data(row_index, '检出限（微克）').values[0] * 5 / 6
 
             s = pd.concat([row[row.isnull()],
-                           (((tmp1 * 0.1) * tmp1) ** 2 + ((0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5,
+                           (((tmp1 * 0.1) * tmp1) ** 2 + (
+                                   (0.5 * self.__get_base_data(row_index, '检出限（微克）').values[0]) ** 2)) ** 0.5,
                            tmp2
                            ])
             s.sort_index(inplace=True)
@@ -176,9 +181,7 @@ class DataTools:
             return True
 
     def __effective_rate_clean_data(self):
-        elements = ['乙烷', '乙烯', '丙烷', '丙烯', '异丁烷', '乙炔', '正丁烷', '异戊烷', '正戊烷', '氟利昂11', '异戊二烯', '氟利昂113', '丙酮', '四氯化碳',
-                    '苯',
-                    '甲苯', '乙基苯', '间/对二甲苯', '邻二甲苯', '苯乙烯']
+
         dataFrame = pd.DataFrame(self.sourcePd)
         for row_index, row in dataFrame.iterrows():
             if not self.__check_data(row, elements):
@@ -236,6 +239,10 @@ class DataTools:
         dataFrame = pd.DataFrame()
         for data in effective_rate_list:
             dataFrame[data['column']] = data['data']
+
+        dataFrame.loc['关键物质'] = dataFrame.loc[elements, :].mean(axis=0)
+        dataFrame.loc['其他物质'] = dataFrame.loc[list(set(dataFrame.index.values) ^ set(elements)), :].mean(axis=0)
+
         # print(dataFrame)
         return dataFrame
 
