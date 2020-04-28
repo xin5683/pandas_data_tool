@@ -252,9 +252,9 @@ class DataTools:
     def output_all(self):
         start = time.time()
         write = pd.ExcelWriter('./out.xlsx')
-        self.get_OFP_classify_sum().to_excel(write, sheet_name='分类和', index=True)
+        self.get_OFP_classify_sum().to_excel(write, sheet_name='OFP分类和', index=True)
         self.get_OFP().to_excel(write, sheet_name='OFP', index=True)
-        self.get_classify_sum().to_excel(write, sheet_name='OFP分类和', index=True)
+        self.get_classify_sum().to_excel(write, sheet_name='分类和', index=True)
         self.get_unit_conversion().to_excel(write, sheet_name='单位换算', index=True)
         self.get_uncertainty().to_excel(write, sheet_name='不确定度', index=True)
         self.get_effective_rate().to_excel(write, sheet_name='有效率', index=True)
