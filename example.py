@@ -21,12 +21,11 @@
 #  OTHER DEALINGS IN THE SOFTWARE.
 
 
-
 from DataTools import DataTools
 
-dataHandle = DataTools("./source_data_test.xlsx")
 
-dataHandle.output_all()
+dataHandle = DataTools()
 
+dataHandle.default_output_all()
 
 

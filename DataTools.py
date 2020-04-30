@@ -30,6 +30,9 @@ import openpyxl
 import xlrd
 from tqdm import tqdm
 from dateutil.parser import parse
+import os.path
+import tkinter as tk
+from tkinter import filedialog
 
 
 def validate_datetime(date_text):
@@ -40,16 +43,34 @@ def validate_datetime(date_text):
         return False
 
 
+def get_now_time():
+    import time
+    ft_time = time.strftime('%Y%m%d_%H%M', time.localtime(time.time()))
+    return ft_time
+
+
 elements = ['乙烷', '乙烯', '丙烷', '丙烯', '异丁烷', '乙炔', '正丁烷', '异戊烷', '正戊烷', '氟利昂11',
             '异戊二烯', '氟利昂113', '丙酮', '四氯化碳', '苯', '甲苯', '乙基苯', '间/对二甲苯', '邻二甲苯', '苯乙烯']
 
 
 class DataTools:
 
-    def __init__(self, excelPath):
+    def __init__(self, excelPath=None):
+        if excelPath:
+            self.source_excelPath = excelPath;
+        else:
+            root = tk.Tk()
+            root.withdraw()
+            self.source_excelPath = filedialog.askopenfilename(title='选择Excel文件', filetypes=[('EXCEL', '*.xlsx')])
+            if self.source_excelPath is '':
+                print("文件打开失败，请选择文件！")
+                exit(-2)
         self.material_attribute_path = './116物质属性.xlsx'
-        self.attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0)
-        self.sourcePd = pd.DataFrame(self.__clean_data(excelPath, self.attribute_dt))
+        self.attribute_dt = pd.read_excel(self.material_attribute_path, sheet_name=0, keep_default_na=True,
+                                          na_values='')
+        self.attribute_dt.replace('', np.nan, inplace=True)
+        # print(self.attribute_dt[self.attribute_dt['目标化合物名称'] == '异戊烷'])
+        self.sourcePd = pd.DataFrame(self.__clean_data(self.source_excelPath, self.attribute_dt))
 
     def __get_base_data(self, Index, Column):
         return self.attribute_dt[self.attribute_dt['目标化合物名称'] == Index][Column]
@@ -163,7 +184,7 @@ class DataTools:
 
         drop_list = list(set(list(tempDT.columns)) ^ set(list(attribute_dt['目标化合物名称'])))
         # print(tempDT)
-        tempDT.drop(drop_list, inplace=True,axis=1)
+        tempDT.drop(drop_list, inplace=True, axis=1)
 
         # print(tempDT)
         return tempDT
@@ -174,7 +195,7 @@ class DataTools:
         user_Series = pd.Series(Series, dtype='float64')
         for element in check_list:
             if element in user_Series.index:
-                if user_Series[element] == -999:
+                if user_Series[element] == np.nan:  # 数据清洗会将-999都变为nan,
                     count_num += 1
                     if count_num > 4:
                         break
@@ -249,16 +270,36 @@ class DataTools:
         # print(dataFrame)
         return dataFrame
 
-    def output_all(self):
+    def get_SOA(self):
+        dataFrame = pd.DataFrame(self.get_unit_conversion())
+        SOA_dataFrame = pd.DataFrame()
+        # print(dataFrame)
+        for row_index, row in tqdm(dataFrame.iteritems(), desc="SOA progress"):
+            FAC = self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['FAC']
+            FVOC = self.attribute_dt[self.attribute_dt['目标化合物名称'] == row_index]['FVOC']
+            if pd.notna(FAC.values[0]) and pd.notna(FVOC.values[0]):
+                SOA_dataFrame[row_index] = row * FAC.values[0] / (1 - FVOC.values[0])
+
+        # print(SOA_dataFrame)
+        return SOA_dataFrame
+
+    def default_output_all(self):
+        if self.source_excelPath is None:
+            print("文件路径异常!!!", self.source_excelPath)
+            exit(-1)
+        out_path = os.path.splitext(self.source_excelPath)[0] + '_' + get_now_time() + \
+                   os.path.splitext(self.source_excelPath)[-1]
         start = time.time()
-        write = pd.ExcelWriter('./out.xlsx')
+        write = pd.ExcelWriter(out_path)
         self.get_OFP_classify_sum().to_excel(write, sheet_name='OFP分类和', index=True)
         self.get_OFP().to_excel(write, sheet_name='OFP', index=True)
         self.get_classify_sum().to_excel(write, sheet_name='分类和', index=True)
         self.get_unit_conversion().to_excel(write, sheet_name='单位换算', index=True)
         self.get_uncertainty().to_excel(write, sheet_name='不确定度', index=True)
         self.get_effective_rate().to_excel(write, sheet_name='有效率', index=True)
+        self.get_SOA().to_excel(write, sheet_name='SOA', index=True)
+        print("处理完成正在写入文件...")
         write.save()
         end = time.time()
-        print("输出文件：out.xlsx")
+        print("输出文件：", out_path)
         print('处理时间' + str(datetime.timedelta(seconds=end - start)))
